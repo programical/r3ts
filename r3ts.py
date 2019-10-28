@@ -52,9 +52,14 @@ class R3TS:
     def speakWord(self, entryId):
         text = self.app.getEntry(entryId)
         if text.endswith(" ") and not self.busy: # if busy, ignore event, try next time
-            self.busy = True
-            self.app.setEntry("Words", "")
-            Thread(target=self.speechThread, args=(text,)).start()
+            self.spawnSpeechThread()
+
+    # clears input and spawns speech thread
+    def spawnSpeechThread(self):
+        text = self.app.getEntry("Words")
+        self.busy = True
+        self.app.setEntry("Words", "")
+        Thread(target=self.speechThread, args=(text,)).start()        
 
     # threading must be used to prevent freezing the text input
     def speechThread(self, word):
@@ -65,8 +70,7 @@ class R3TS:
         # helpful when sentence-ending word is in queue
         newText = self.app.getEntry("Words")
         if newText.endswith(" "):
-            self.app.setEntry("Words", "")
-            Thread(target=self.speechThread, args=(newText,)).start()
+            self.spawnSpeechThread()
         else:
             self.busy = False
 
