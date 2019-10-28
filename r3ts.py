@@ -5,70 +5,87 @@ from threading import Thread
 from appJar import gui
 import pyttsx3
 
-# change event function of text input
-def speakWord(entryId):
-    text = app.getEntry(entryId)
-    if " " in text:
-        app.setEntry("Words", "")
-        Thread(target=speechThread, args=(text,)).start()
+class R3TS:
+    def __init__(self):
+        # tts setup
+        self.tts = pyttsx3.init()
+        self.busy = False
+        
+        # window setup
+        self.app = gui(showIcon=False)
+        self.app.setTitle("R3TS")
 
-# threading must be used to prevent freezing the text input
-def speechThread(word):
-    while True:
-        try:
-            sleep(0.2) # I don't know why this needs a delay, but it does bad stuff without it
-            tts.say(word)
-            tts.runAndWait()
-            break
-        except RuntimeError:
-            pass
+        # WPM scale setup
+        self.app.addLabelScale("WPM")
+        self.app.setScaleChangeFunction("WPM", self.setSpeed)
+        self.app.setScaleRange("WPM", 60, 300)
+        self.app.setScaleIncrement("WPM", 10)
+        self.app.showScaleIntervals("WPM", 120)
+        self.app.setScale("WPM", 180, callFunction=True)
 
-# change event function of WPM slider
-def setSpeed(scaleId):
-    speed = app.getScale(scaleId)
-    tts.setProperty("rate", speed)
+        # volume scale setup
+        self.app.addLabelScale("Volume")
+        self.app.setScaleChangeFunction("Volume", self.setVolume)
+        self.app.setScaleRange("Volume", 0, 100)
+        self.app.setScaleIncrement("Volume", 10)
+        self.app.showScaleIntervals("Volume", 50)
+        self.app.setScale("Volume", 50, callFunction=True)
 
-# change event function of voice select
-def setVoice(optionsId):
-    tts.setProperty("voice", app.getOptionBox("Voice").split(": ")[0])
+        # voice options setup
+        voiceOptions = []
+        for voice in self.tts.getProperty("voices"):
+            voiceOptions.append(str(voice.id) + " ::: " + str(voice.gender))
 
-# change event function of volume slider
-def setVolume(scaleId):
-    tts.setProperty("volume", app.getScale("Volume")/100.0)
+        self.app.addLabelOptionBox("Voice", voiceOptions)
+        self.app.setOptionBox("Voice", 0, callFunction=True)
+        self.app.setOptionBoxChangeFunction("Voice", self.setVoice)
 
-# tts
-tts = pyttsx3.init()
+        # text input setup
+        self.app.addEntry("Words")
+        self.app.setEntry("Words", "", callFunction=True)
+        self.app.setEntryChangeFunction("Words", self.speakWord)
+        
+    def go(self):
+        self.app.go()
+        
+    # change event function of text input
+    def speakWord(self, entryId):
+        text = self.app.getEntry(entryId)
+        if text.endswith(" ") and not self.busy: # if busy, ignore event, try next time
+            self.busy = True
+            self.app.setEntry("Words", "")
+            Thread(target=self.speechThread, args=(text,)).start()
 
-# window setup
-app = gui(showIcon=False)
-app.setTitle("R3TS")
+    # threading must be used to prevent freezing the text input
+    def speechThread(self, word):
+        self.tts.say(word)
+        self.tts.runAndWait()
+        
+        # start next one right away if possible
+        # helpful when sentence-ending word is in queue
+        newText = self.app.getEntry("Words")
+        if newText.endswith(" "):
+            self.app.setEntry("Words", "")
+            Thread(target=self.speechThread, args=(newText,)).start()
+        else:
+            self.busy = False
 
-# WPM scale setup
-app.addLabelScale("WPM")
-app.setScaleChangeFunction("WPM", setSpeed)
-app.setScaleRange("WPM", 60, 300)
-app.showScaleIntervals("WPM", 120)
-app.setScale("WPM", 180, callFunction=True)
+    # change event function of WPM slider
+    def setSpeed(self, scaleId):
+        speed = self.app.getScale(scaleId)
+        self.tts.setProperty("rate", speed)
 
-# volume scale setup
-app.addLabelScale("Volume")
-app.setScaleChangeFunction("Volume", setVolume)
-app.setScaleRange("Volume", 0, 100)
-app.showScaleIntervals("Volume", 50)
-app.setScale("Volume", 50, callFunction=True)
+    # change event function of voice select
+    def setVoice(self, optionsId):
+        self.tts.setProperty("voice", self.app.getOptionBox("Voice").split(" ::: ")[0])
 
-# voice options setup
-voiceOptions = []
-for voice in tts.getProperty("voices"):
-    voiceOptions.append(str(voice.id) + ": " + str(voice.gender))
+    # change event function of volume slider
+    def setVolume(self, scaleId):
+        self.tts.setProperty("volume", self.app.getScale("Volume")/100.0)
 
-app.addLabelOptionBox("Voice", voiceOptions)
-app.setOptionBox("Voice", 0, callFunction=True)
-app.setOptionBoxChangeFunction("Voice", setVoice)
+def main():
+    R3TS().go()
+    
+if __name__ == "__main__":
+    main()
 
-# text input setup
-app.addEntry("Words")
-app.setEntry("Words", "", callFunction=True)
-app.setEntryChangeFunction("Words", speakWord)
-
-app.go()
