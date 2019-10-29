@@ -10,6 +10,7 @@ class R3TS:
         # tts setup
         self.tts = pyttsx3.init()
         self.busy = False
+        self.endChars = (" ", ".", ",", "!", "?")
         
         # window setup
         self.app = gui(showIcon=False)
@@ -51,7 +52,7 @@ class R3TS:
     # change event function of text input
     def speakWord(self, entryId):
         text = self.app.getEntry(entryId)
-        if text.endswith(" ") and not self.busy: # if busy, ignore event, try next time
+        if text.endswith(self.endChars) and not self.busy: # if busy, ignore event, try next time
             self.spawnSpeechThread()
 
     # clears input and spawns speech thread
@@ -69,7 +70,7 @@ class R3TS:
         # start next one right away if possible
         # helpful when sentence-ending word is in queue
         newText = self.app.getEntry("Words")
-        if newText.endswith(" "):
+        if newText.endswith(self.endChars):
             self.spawnSpeechThread()
         else:
             self.busy = False
